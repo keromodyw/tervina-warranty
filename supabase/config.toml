@@ -1,0 +1,41 @@
+project_id = "luorbjecmvqneyuosipk"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[auth]
+# REQUIRED (D1): customers activate anonymously and own their claim via
+# auth_user_id. Without this the whole claim flow is unreachable.
+enable_anonymous_sign_ins = true
+enable_signup = true
+# Staff sign in with email + password only. No social providers in v1.
+enable_manual_confirmations = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+# Staff invites are created by an admin or seeded; no self-service password reset
+# is needed for anonymous customers, and staff reset goes through an admin.
+enable_password_reset = true
+
+[storage]
+enabled = true
+# Claim photos are warranty evidence — private bucket, RLS-controlled access.
+file_size_limit = "20MiB"
+
+[auth.email.template.confirm]
+subject = "تفعيل الضمان"

@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/cairo';
+
+/*
+ * Design tokens sampled from the live reference site (PROJECT_MAP [DESIGN TOKENS]).
+ * Everything visual derives from these — no hardcoded hex in components.
+ */
+@theme {
+  --font-sans:
+    'Cairo Variable', 'Cairo', system-ui, 'Segoe UI', 'Noto Sans Arabic', sans-serif;
+
+  /* brand blues — buttons, headers, active states */
+  --color-brand-50: #f7f9fc;
+  --color-brand-100: #edf2f7;
+  --color-brand-200: #d3e0ef;
+  --color-brand-300: #a9c6e3;
+  --color-brand-400: #6d9dd0;
+  --color-brand-500: #2b6cb0;
+  --color-brand-600: #215387;
+  --color-brand-700: #1a426d;
+  --color-brand-800: #003366;
+  --color-brand-900: #002952;
+
+  /* navy text scale */
+  --color-ink-900: #1a202c;
+  --color-ink-700: #2d3748;
+  --color-ink-500: #4a5568;
+  --color-ink-400: #718096;
+  --color-ink-200: #cbd5e0;
+  --color-ink-100: #edf2f7;
+
+  /* status */
+  --color-surface: #f7fafc;
+  --color-success-600: #13612e;
+  --color-success-500: #25d366;
+  --color-danger-700: #b82105;
+  --color-warning-600: #f7630c;
+  --color-warning-500: #f5a524;
+  --color-link: #1159af;
+
+  --radius-card: 12px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-surface);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    /* Arabic web fonts render with inconsistent line boxes; nudge it. */
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /*
+   * iOS Safari zooms the viewport on input focus unless font-size >= 16px.
+   * Every form control must clear this bar or the whole wizard jumps.
+   */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: max(1rem, 1rem);
+    font-family: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Latin digits inside Arabic copy (serials, dates, durations) read better
+     left-to-right even in an RTL paragraph. */
+  .ltr-nums {
+    direction: ltr;
+    unicode-bidi: isolate;
+    display: inline-block;
+  }
+}

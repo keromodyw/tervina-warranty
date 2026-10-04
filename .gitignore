@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# env — .env.example IS committed, .env is not
+.env
+.env.local
+.env.*.local
+
+# generator scratch: re-extractable from the workbook, never edit
+tools/.work/
+
+# supabase local stack
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+# Cloudflare Pages SPA fallback.
+# Without this, a hard refresh or a pasted link on /ar/activation 404s because
+# Pages serves static files only and has no route table.
+/*  /index.html  200
+
+# Hashed build assets are immutable — cache them hard.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Never cache the shell or the entry HTML.
+/index.html
+  Cache-Control: no-cache, must-revalidate
+
+# zxing-C++ wasm is self-hosted (PROJECT_MAP [TECH_STACK]) — no third-party CDN.
+/wasm/*
+  Cache-Control: public, max-age=31536000, immutable

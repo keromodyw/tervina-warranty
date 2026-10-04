@@ -1,0 +1,8 @@
+# Normalise line endings so CRLF/LF differences never show up as whole-file diffs.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.woff2 binary
+*.xlsx binary
