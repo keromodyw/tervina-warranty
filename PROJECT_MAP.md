@@ -29,7 +29,7 @@
 | D18 | Serial | **Globally UNIQUE** | Stated goal: "منع التكرار / كشفFRAUD". Hard DB constraint. |
 | D19 | Legacy import | Imported rows forced to `reviewed + sent + photos_uploaded = true` | Client directive — they are completed historical orders. |
 | D20 | Photo archive | **ZIP**, one folder per `serial` | RAR encoding is impossible open-source (verified). Client: "all I care about is the folder named after the serial". WinRAR/7-Zip open it unchanged. |
-| D21 | Uncollected Sheet1 columns | **Exported empty**, wizard unchanged | The 8 legacy-only columns keep their headers so the file stays importable round-trip. |
+| D21 | Uncollected Sheet1 columns | **Exported empty**, wizard unchanged | The 7 legacy-only columns (`I`, `L`, `M`, `S`, `T`, `U`, `V`) keep their headers so the file stays importable round-trip. |
 | D22 | Reference data is editable | **`warranty_rules` table** + a **Settings** tab in admin; the generated TS stays the base layer | `سباحه` has no duration "for now", which means durations must be changeable without a redeploy. Resolution order = DB row → generated base → `null`. |
 | D23 | Terminology | **The workbook is authoritative** for all `item_type` / `product_type` strings | Client directive. The chat spelling differs from the sheet in 6 places — the sheet wins everywhere, including Sheet1's `نوع الموتور` (D12). |
 | D24 | `طلمبات اعماق` product list | **`فاما · ترفينا`** (overrides the workbook's 4) | Client directive: "take whatever in the message". Applied as an explicit, logged override in the generator — not a silent edit. |
@@ -295,7 +295,9 @@ capture the expanded region → sharpness + Code128 decode on THAT crop
 | 22 | V | اسم الموظف | ❌ admin-side only |
 | 23 | W | ملاحظات | `notes` (admin + customer) |
 
-**8 of 23 columns are never populated by the new flow** — `I`, `L`, `M`, `S`, `T`, `U`, `V`, and `كود الفنى`. **Resolved: export them empty** (D21), wizard unchanged. Import still reads them when present, so legacy files round-trip.
+**7 of 23 columns are never populated by the new flow** — `I`, `L`, `M`, `S`, `T`, `U`, `V`. **Resolved: export them empty** (D21), wizard unchanged. Import still reads them when present, so legacy files round-trip.
+
+> **Correction (M1):** this was previously written as "8" and listed `كود الفنى` as an eighth entry — but `كود الفنى` *is* column `I`, so it was counted twice. `W = ملاحظات` **is** collected as `notes`. The true count is **7**. The wizard also has no `notes` field yet; if that stays unimplemented the count is 8 and `W` joins the blank list.
 
 ---
 
@@ -381,7 +383,7 @@ Needs a definition from the client (**B19**). Proposed default, all derivable fr
 
 **Photo archive (D20).** ZIP, one folder per `serial`. Only `approved AND photos_exported = false`.
 
-**Excel (D21).** All 23 Sheet1 headers emitted in A→W order; the 8 legacy-only columns (`I`, `L`, `M`, `S`, `T`, `U`, `V`, and `كود الفنى`) are written **empty**. Round-trip is safe because import reads by header name, not position.
+**Excel (D21).** All 23 Sheet1 headers emitted in A→W order; the 7 legacy-only columns (`I`, `L`, `M`, `S`, `T`, `U`, `V`) are written **empty**. Round-trip is safe because import reads by header name, not position.
 
 ---
 
@@ -491,7 +493,7 @@ The same resolver generates the `warranty_rules` seed, so the Settings baseline 
 
 Resolution order at runtime: `warranty_rules` row → generated base → `null`.
 
-- Staff-only RLS. Anon gets **no access** — durations aren't customer data, so deny by default, grant to `is_staff`.
+- **Public `SELECT`, staff-only writes.** ⚠️ *Corrected during M1:* this section previously said "anon gets no access", which contradicted the resolution order directly above — the public wizard cannot resolve a duration from the DB it is forbidden to read. Durations are published warranty terms, not customer data, so **all roles may `SELECT`** and only `is_staff()` may insert/update/delete. Migration `20260101120300_04` / `20260101120600_07`. A8's "rejected by RLS" applies to **writes**, which is the part that matters.
 - The generated TS stays in the repo as the base layer, so `tools/gen-data.mjs` remains reproducible.
 - Editor: filter by `item_type`, inline numeric input per row, empty = `null`. **Save per row**, not save-all — 22 rows of unsaved edits is a footgun.
 - **Duration is snapshotted onto the claim at submit** (D25). Editing a duration must never rewrite a past certificate.
@@ -615,7 +617,7 @@ staff                      -- D28: WHO may use the admin panel
 |---|---|---|
 | ~~B14~~ | "4 photos" vs 3 named | **3** — it was a miscount. Manifest locked. |
 | ~~B15~~ | القطاع mapping | **Official 7 groups.** Table locked above. |
-| ~~B17~~ | 8 uncollected Sheet1 columns | **Exported empty**, wizard unchanged (D21). |
+| ~~B17~~ | 7 uncollected Sheet1 columns | **Exported empty**, wizard unchanged (D21). |
 | ~~B20~~ | RAR encoding | **ZIP.** RAR is impossible open-source; client accepted ZIP (D20). |
 | ~~B13~~ | **Taxonomy + warranty mapping** | **Resolved 2026-10-01.** `سباحه` = no duration for now (D22). `طلمبات اعماق` = `فاما·ترفينا` per the message (D24). Workbook spelling authoritative (D23). **Verified 22/22** by `tools/resolve-warranty.mjs`. |
 | ~~B12~~ | `نوع المنتج` vs `نوع الموتور` | **Workbook wins** — `نوع الموتور` everywhere (D23). |
@@ -657,7 +659,11 @@ staff                      -- D28: WHO may use the admin panel
 - **No component test suite in v1.** Only `vitest` unit tests on the 4 pure logic modules. Camera behaviour verified manually on real devices. Tradeoff accepted for speed.
 - **Zxing-C++ wasm ≈1.04 MiB.** Lazy-loaded only when Step 2 opens, via `import('zxing-wasm/reader')`. Self-hosted from `/wasm` via `prepareZXingModule({ overrides:{ locateFile }})` — not jsDelivr.
 - **TS 7** is the native-port line. If any tool chokes, drop to 6.x; no code impact expected.
-- **Phone is the only identity.** Two different people sharing a number collapse to one customer row (upsert). Acceptable for warranty; noted.
+- **Phone is the identity for *tracking*, not for *ownership*.** ⚠️ *Corrected during M1:* this previously read "phone UNIQUE — shared numbers collapse to one customer row (upsert)". That cannot coexist with per-user ownership:
+  - a second family member sharing the number **cannot INSERT** (unique violation) and cannot read the owner's row (RLS) → they are unable to activate a pump at all;
+  - making the app "helpfully" re-point that row at the new auth user means anyone who knows a phone number can **take over another customer's dashboard**.
+
+  So `customers.phone` is **indexed, not unique**; ownership stays bound to `auth_user_id`. Shared numbers still collapse exactly where it matters — `track_claims_by_phone(p_phone)` matches on phone and returns **every** claim on that number, so a family sees all of its own pumps in one place. Migration `20260101120200_03`.
 - **Durations live in the DB, taxonomy in the repo.** A duration is editable without a redeploy; adding a *product* still needs `gen-data.mjs`. Deliberate split — 22 rows change often, 274 cities never do.
 - **Quad detection is the biggest remaining risk**, and it is riskier than the sharpness FSM it sits beside: a wrong-but-valid quad could frame a bad photo that still decodes. Mitigations are the validity gates, the `too_close` refusal, and post-capture validation re-running sharpness **and** decode on the actual crop. If it proves flaky on real hardware, the zxing-derived quad is a permanent acceptable fallback, not a regression.
 
@@ -726,7 +732,7 @@ Each gate is a **command or an observable**, not a vibe.
 | **A3** | مراجعة | Approve flips `status`; decline flips it **and requires a reason**; a declined claim disappears from the stats totals, the Excel export, and the photo archive. |
 | **A4** | إرسال للعميل | Button is **disabled unless `status = approved`**. Clicking opens `wa.me` with the template; `sent_to_customer` becomes `true`. Spot-check the URL is correctly percent-encoded (Arabic + RTL). |
 | **A5** | رفع الصور | Only `approved AND photos_exported = false` are included. ZIP contains one folder per `serial`, named exactly that. Re-running includes nothing new. *(D20)* |
-| **A6** | تحميل اكسيل | Modal offers الكل / فترة معينة / أنهاردة. Downloaded `.xlsx` has the **exact 23 headers in A→W order**, the 8 legacy-only columns empty, and row count matching the filter. *(D21)* |
+| **A6** | تحميل اكسيل | Modal offers الكل / فترة معينة / أنهاردة. Downloaded `.xlsx` has the **exact 23 headers in A→W order**, the 7 legacy-only columns empty, and row count matching the filter. *(D21)* |
 | **A7** | رفع بيانات قديمة | Importing a Sheet1-shaped file creates claims with `reviewed + sent + photos_exported = true`. Re-importing the same file **fails on duplicate serial** — this is the fraud baseline (D18). Malformed rows are reported per-row, not silently skipped. |
 | **A8** | **الإعدادات (Settings)** | All 22 rows render with their current duration. Setting `سباحه · scp` to a number and reloading changes what a **new** claim derives — and a claim submitted **before** the edit still shows its old duration (D25). Empty cell saves as `null`, not `0`. Non-staff is rejected by RLS, not just hidden in the UI. |
 | **A9** | **Admins (staff)** | Admin A adds `b@example.com` by email. That person signs up with the same email, lands in `/admin`, and a 4th row appears for editing their entry. Setting `is_active = false` revokes their access on the **next request**, while their past `reviewed_by` stays intact. The anon key is rejected by RLS for every staff operation. |
