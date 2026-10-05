@@ -5,21 +5,20 @@
 -- exception, and it lives outside supabase/migrations/ on purpose.
 --
 -- How to run:
---   1. Edit v_email and v_name below (both must be lowercase).
---   2. Paste into Supabase Dashboard -> SQL Editor and run it.
---   3. In Authentication -> Users, "Add user" with that same email.
+--   1. Paste into Supabase Dashboard -> SQL Editor and Run. (Already filled in.)
+--   2. In Authentication -> Users, "Add user" with keromodyw@gmail.com.
 --      No email confirmation needed; the trigger links it automatically.
---   4. The staff row's user_id fills in on insert. Verify:
+--   3. Set a password for that user so you can actually sign in.
+--   4. Verify:
 --        select user_id, email, is_active from public.staff;
 --
--- Step 3 does not need a password for the account to gain admin rights - the
--- trigger only matches the email. Set a password when you create the user so the
--- person can actually sign in.
+-- Step 2 does not need a password for the row to gain admin rights - the trigger
+-- only matches the email. The password is just so the account is usable.
 
 do $$
 declare
-  v_email text := 'first-admin@example.com';
-  v_name  text := 'FIRST ADMIN FULL NAME';
+  v_email text := 'keromodyw@gmail.com';
+  v_name  text := 'Kero mody';
 begin
   if v_email like '%@example.com%' then
     raise exception 'Edit v_email in this file before running (got %)', v_email;
