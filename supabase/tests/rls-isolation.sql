@@ -35,7 +35,7 @@ begin
   insert into public.customers (auth_user_id, full_name, phone, governorate, city, sector)
   values (a_user, 'A Customer', '01000000001', 'القاهرة', 'مدينة نصر', 'القاهرة');
 
-  insert into public.warranty_claims (customer_id, serial, item_type, product, capacity,
+  insert into public.warranty_claims (customer_id, serial, item_type, product_type, capacity,
                                       warranty_months, warranty_start)
   select id, '100000000001', 'طلمبات صينى تحضير', 'ترفينا', '1ح', 24, current_date
     from public.customers where full_name = 'A Customer';
@@ -43,7 +43,7 @@ begin
   insert into public.customers (auth_user_id, full_name, phone, governorate, city, sector)
   values (b_user, 'B Customer', '01000000002', 'الجيزة', 'الدقي', 'الوجه القبلي');
 
-  insert into public.warranty_claims (customer_id, serial, item_type, product, capacity,
+  insert into public.warranty_claims (customer_id, serial, item_type, product_type, capacity,
                                       warranty_months, warranty_start)
   select id, '100000000002', 'حمايه', 'خزان تيوبلس 19لتر', null, 12, current_date
     from public.customers where full_name = 'B Customer';
@@ -128,7 +128,7 @@ do $$
 declare n int;
 begin
   update public.warranty_rules set warranty_months = 120
-   where item_type = 'حمايه' and product = 'خزان تيوبلس 19لتر';
+   where item_type = 'حمايه' and product_type = 'خزان تيوبلس 19لتر';
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'FAIL: B changed % warranty rule(s)', n; end if;
   raise notice 'PASS (B): cannot edit warranty durations (0 rows)';

@@ -18,7 +18,7 @@ create table if not exists public.warranty_claims (
   serial          text not null unique,
 
   item_type       text not null,
-  product         text not null,
+  product_type         text not null,
   capacity        text,
 
   -- Snapshot of the rule at submission time. Later Settings edits must never

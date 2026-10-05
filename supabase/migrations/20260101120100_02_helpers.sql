@@ -75,6 +75,13 @@ create trigger on_auth_user_created
 -- Normalise an Egyptian number to +20XXXXXXXXXX.
 -- Single source of truth: the app, the tracking RPC and staff search must all
 -- agree, otherwise tracking silently returns zero rows for a valid customer.
+--
+-- Kept deliberately identical to src/core/lib/phone.ts. Two bugs were found and
+-- fixed here first, and both are pinned by phone.test.ts on the TS side:
+--   1. Arabic-Indic digits (٠-٩) were stripped instead of folded, so a number
+--      typed on an Arabic keyboard returned NULL.
+--   2. A `length = 11 and left = '1'` branch mangled foreign numbers, turning
+--      +1 415 555 2671 into +204155552671.
 create or replace function public.normalize_phone(raw text)
 returns text
 language sql
@@ -84,14 +91,22 @@ as $$
   select case
     when raw is null then null
     when digits = '' then null
+    when left(digits, 2) = '00' then
+      case when length(digits) > 2 then '+' || substr(digits, 3) else null end
     when digits like '20%' and length(digits) = 12 then '+' || digits
     when left(digits, 1) = '0' then '+20' || ltrim(substr(digits, 2), '0')
     when length(digits) = 10 then '+20' || digits
-    when length(digits) = 11 and left(digits, 1) = '1' then '+20' || substr(digits, 2)
     else '+' || digits
   end
   from (
-    select regexp_replace(coalesce(raw, ''), '[^0-9]', '', 'g') as digits
+    -- Fold Arabic-Indic and Eastern Arabic-Indic digits BEFORE stripping, so a
+    -- valid Egyptian number is not deleted to an empty string.
+    select regexp_replace(
+             translate(coalesce(raw, ''),
+                       '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹',
+                       '01234567890123456789'),
+             '[^0-9]', '', 'g'
+           ) as digits
   ) s;
 $$;
 

@@ -2,9 +2,8 @@
 -- TERVINA WARRANTY - APPLY EVERYTHING, IN THIS ORDER
 -- Paste the WHOLE file into Supabase Dashboard -> SQL Editor -> Run.
 --
--- This is the concatenation of supabase/migrations/* + supabase/seed.sql,
--- kept only as a convenience. The migrations/ directory stays the source of
--- truth for supabase db reset and for future diffing.
+-- Concatenation of supabase/migrations/* + supabase/seed.sql.
+-- migrations/ stays the source of truth for supabase db reset.
 -- ============================================================
 
 -- ---------- BEGIN supabase\migrations\20260101120000_01_staff.sql ----------
@@ -239,7 +238,7 @@ create table if not exists public.warranty_rules (
   id              uuid primary key default gen_random_uuid(),
 
   item_type       text not null,
-  product         text not null,
+  product_type         text not null,
 
   -- NULL is meaningful: product types such as Ø§Ù„Ø³Ø¨Ø§Ø­Ø© have no duration yet.
   warranty_months integer,
@@ -247,7 +246,7 @@ create table if not exists public.warranty_rules (
   updated_by      uuid references auth.users (id) on delete set null,
   updated_at      timestamptz not null default now(),
 
-  constraint warranty_rules_unique_pair unique (item_type, product),
+  constraint warranty_rules_unique_pair unique (item_type, product_type),
   constraint warranty_rules_months_sane check (
     warranty_months is null or warranty_months between 0 and 120
   )
@@ -281,7 +280,7 @@ create table if not exists public.warranty_claims (
   serial          text not null unique,
 
   item_type       text not null,
-  product         text not null,
+  product_type         text not null,
   capacity        text,
 
   -- Snapshot of the rule at submission time. Later Settings edits must never
@@ -634,7 +633,7 @@ returns table (
   activation_code text,
   serial          text,
   item_type       text,
-  product         text,
+  product_type   text,
   capacity        text,
   status          text,
   warranty_start  date,
@@ -650,7 +649,7 @@ as $$
     wc.activation_code,
     wc.serial,
     wc.item_type,
-    wc.product,
+    wc.product_type,
     wc.capacity,
     wc.status,
     wc.warranty_start,

@@ -12,7 +12,7 @@ create table if not exists public.warranty_rules (
   id              uuid primary key default gen_random_uuid(),
 
   item_type       text not null,
-  product         text not null,
+  product_type         text not null,
 
   -- NULL is meaningful: product types such as السباحة have no duration yet.
   warranty_months integer,
@@ -20,7 +20,7 @@ create table if not exists public.warranty_rules (
   updated_by      uuid references auth.users (id) on delete set null,
   updated_at      timestamptz not null default now(),
 
-  constraint warranty_rules_unique_pair unique (item_type, product),
+  constraint warranty_rules_unique_pair unique (item_type, product_type),
   constraint warranty_rules_months_sane check (
     warranty_months is null or warranty_months between 0 and 120
   )
