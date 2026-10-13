@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
@@ -27,5 +27,15 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+  },
+  // Tests only touch pure modules, but session.ts imports the Supabase client,
+  // which throws when the env is absent - as it is on CI, where .env is not
+  // committed. These placeholders keep `npm test` self-contained; the real
+  // values only matter at build time, where the workflow injects them.
+  test: {
+    env: {
+      VITE_SUPABASE_URL: 'http://localhost:54321',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+    },
   },
 })
