@@ -6,6 +6,24 @@
     <meta name="theme-color" content="#215387" />
     <meta name="description" content="تفعيل ضمان منتجات تروفينا" />
     <title>تفعيل الضمان | تروفينا</title>
+    <script>
+      // GitHub Pages serves static files only, so refreshing a deep link such as
+      // /repo/ar/track would hit its 404 page instead of the app. 404.html
+      // rewrites the real path into the query string and bounces here; this
+      // restores it before the bundle loads. Harmless when there is no query.
+      ;(function (l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search
+            .slice(1)
+            .split('&')
+            .map(function (s) {
+              return s.replace(/~and~/g, '&')
+            })
+            .join('?')
+          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash)
+        }
+      })(window.location)
+    </script>
   </head>
   <body>
     <div id="root"></div>

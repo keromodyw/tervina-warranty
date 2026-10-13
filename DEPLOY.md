@@ -27,34 +27,62 @@ all nine migrations plus the 22 warranty rules.
 Finally paste `supabase/tests/rls-isolation.sql` and Run. You want a wall of green
 `PASS (...)` lines and no `FAIL`. That proves no customer can read another's data.
 
-## STEP 2 - Go live (10 minutes)
+## STEP 2 - Go live
 
-### One-time (needs your login)
+Two hosts are wired up and both are free. They differ in one way that matters:
+**GitHub Pages can be public-only on the free plan and has a 100 GB/month soft
+bandwidth limit; Cloudflare Pages has neither cap.** Use GitHub now to test, and
+Cloudflare when real customers arrive.
+
+### Option A - GitHub Pages (testing now)
+
+Camera works: `github.io` is HTTPS. Nothing to buy.
+
+1. Create a repo on GitHub and push this project to it (see *Step 2a* below).
+2. Repo → **Settings → Pages → Source: GitHub Actions**. One time.
+3. Repo → **Settings → Secrets and variables → Actions**, add two repository
+   secrets. Values are the same two lines as `.env.example`:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. Push to `main`. The workflow in `.github/workflows/deploy-pages.yml` builds,
+   tests, and publishes. URL: `https://<user>.github.io/<repo>/`.
+
+**Free-plan caveat:** Pages from a private repo requires a paid plan. This repo
+contains no secrets - the anon key is public by design and is injected at build
+time from the secrets above, never committed - so a **public repo is fine**.
+
+**Step 2a - push:**
 
 ```
-npx wrangler login
+gh auth login            # one time
+gh repo create tervina-warranty --public --source=. --remote=origin --push
 ```
 
-Opens your browser - approve it.
-
-### Create and deploy
+### Option B - Cloudflare Pages (final host)
 
 ```
+npx wrangler login       # one time, opens your browser
 wrangler pages project create tervina-warranty
 npm.cmd run build
 npx wrangler pages deploy dist --project-name tervina-warranty
 ```
 
-You get `https://tervina-warranty.pages.dev`. Camera works. Done.
+You get `https://tervina-warranty.pages.dev`. No bandwidth cap.
 
-### Or: auto-deploy from GitHub, no terminal after setup
+Or auto-deploy from GitHub: Cloudflare Pages → *Create* → *Pages* →
+*Connect to Git*, build command `npm run build`, output `dist`.
 
-Push to GitHub, then Cloudflare Pages → *Create* → *Pages* → *Connect to Git*:
+> Both hosts can later take the GoDaddy domain from *Custom domains*. The domain
+> does not care which host serves it.
 
-- Build command: `npm run build`
-- Output directory: `dist`
+### Why the build has two entry points
 
-Every `git push` deploys itself.
+`npm run build` targets a root-served host (`pages.dev`, a custom domain).
+`npm run build:pages` targets GitHub Pages, which serves a project repo from
+`/<repo>/`, not the root. The difference is `PAGES_BASE`, which sets Vite's asset
+base **and** the React Router basename, so assets and deep links resolve either
+way. `build:pages` also emits `404.html` (GitHub Pages has no server-side
+rewrite, so a refresh on `/ar/track` would otherwise 404) and `.nojekyll`.
 
 ### Zero-setup alternative (~3 min)
 
@@ -81,9 +109,10 @@ bucket - authored, and awaiting Step 1 to be executed).
 |---|---|---|
 | Anonymous sign-ins ON | Every customer activation | you (Step 1) |
 | `APPLY-ALL.sql` executed | Tables, RLS, tracking, photos | you (Step 1) |
-| Cloudflare login | Publishing | you (Step 2) |
+| A GitHub repo + 2 Actions secrets | Publishing to github.io | you (Step 2A) |
+| Cloudflare login | Publishing to pages.dev (final) | you (Step 2B) |
 | First admin account | Admin panel | you - row is ready for `keromodyw@gmail.com`, just add the user in Authentication → Users |
-| Wizard steps M2–M7 | The actual product | me |
+| Wizard steps M3–M7 | The actual product | me |
 
 ---
 

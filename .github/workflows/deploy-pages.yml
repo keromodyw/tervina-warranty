@@ -1,0 +1,72 @@
+name: Deploy to GitHub Pages
+
+# Free-plan GitHub Pages only publishes from public repositories. This repo holds
+# no secrets: the Supabase anon key is a public key by design and is supplied at
+# build time from Actions secrets rather than committed. See DEPLOY.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than fighting over the Pages environment.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify
+        run: |
+          npm run typecheck
+          npm test
+
+      # A user site (<user>.github.io) is served from the root; every other repo
+      # is served from /<repo>/. Vite needs to know which, or every asset 404s.
+      - name: Compute base path
+        id: base
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          if [[ "$REPO" == *.github.io ]]; then
+            echo "path=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=/$REPO/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        env:
+          PAGES_BASE: ${{ steps.base.outputs.path }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build:pages
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
