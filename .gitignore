@@ -13,6 +13,10 @@ dist/
 # generator scratch: re-extractable from the workbook, never edit
 tools/.work/
 
+# raw source images — copied into src/assets/ under import-safe names
+/*.png
+
+
 # supabase local stack
 supabase/.branches/
 supabase/.temp/

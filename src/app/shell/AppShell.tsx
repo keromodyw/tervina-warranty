@@ -1,18 +1,22 @@
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Link, Outlet } from 'react-router'
 import { cn } from '@/core/lib/cn'
+import headerLogo from '@/assets/header-logo.png'
+import footerPhoto from '@/assets/footer-photo.png'
 
-const NAV: ReadonlyArray<{ to: string; label: string; end: boolean }> = [
-  { to: '/', label: 'الرئيسية', end: true },
-  { to: '/ar/activation', label: 'تفعيل الضمان', end: false },
-  { to: '/ar/track', label: 'تتبع طلبك', end: false },
-]
+const NAV = [
+  { to: '/ar/activation', label: 'الرئيسية', end: true },
+  { to: '/ar/activation/new', label: 'تفعيل الضمان', end: false },
+  { to: '/ar/activation/track', label: 'تتبع طلبك', end: false },
+] as const
 
 export function AppShell() {
   return (
     <div dir="rtl" className="flex min-h-dvh flex-col bg-surface">
       <header className="border-b border-ink-100 bg-white">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <span className="text-lg font-bold text-brand-800">تروفينا</span>
+          <Link to="/ar/activation" className="flex items-center">
+            <img src={headerLogo} alt="ترفينا" className="h-10 w-auto sm:h-12" />
+          </Link>
           <nav className="flex items-center gap-1 text-sm">
             {NAV.map((item) => (
               <NavLink
@@ -40,11 +44,7 @@ export function AppShell() {
       </main>
 
       <footer className="border-t border-ink-100 bg-white">
-        <div className="mx-auto w-full max-w-5xl px-4 py-4 text-center text-sm text-ink-400">
-          <p>
-            للاستفسار عن الضمان اتصل على <span className="ltr-nums">19301</span>
-          </p>
-        </div>
+        <img src={footerPhoto} alt="ترفينا" className="h-auto w-full object-cover" />
       </footer>
     </div>
   )

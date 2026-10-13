@@ -90,7 +90,7 @@ const normKey = (s) =>
 const DISPLAY_OVERRIDES = {
   [normKey('الاقصر')]: '\u0627\u0644\u0623\u0642\u0635\u0631', // الأقصر
   [normKey('الاسكندرية')]: '\u0627\u0644\u0625\u0633\u0643\u0646\u062F\u0631\u064A\u0629', // الإسكندرية
-  [normKey('الاسسماعيلية')]: '\u0627\u0644\u0625\u0633\u0645\u0627\u0639\u064A\u0644\u064A\u0629', // الإسماعيلية
+  // NOTE: Ismailia is deliberately NOT overridden. The workbook ships the no-hamza spelling and we ship it as-is (2026-10 decision); an earlier entry here keyed on a doubled-seen typo and could never match.
   [normKey('اسوان')]: '\u0623\u0633\u0648\u0627\u0646', // أسوان
   [normKey('اسيوط')]: '\u0623\u0633\u064A\u0648\u0637', // أسيوط
 }

@@ -49,10 +49,44 @@ export function serialErrorMessage(reason: 'empty' | 'non_digits' | 'too_long'):
 }
 
 /**
- * Symbology check for decoded barcodes. Code128 is the agreed format (D16);
- * anything else means we pointed the camera at the wrong thing (a QR code on an
- * invoice, say) and must not silently store that value as the serial.
+ * Symbology whitelist for decoded barcodes.
+ *
+ * The serial label is Code128, but pumps in the field also turn up with Code39,
+ * ITF and Codabar markings, so every common 1-D (linear) symbology is accepted -
+ * the serial itself is still validated as digits-only by checkSerial(), so a
+ * letter-bearing payload can never be stored. 2-D codes (QR / Data Matrix /
+ * PDF417 / Aztec) are deliberately NOT accepted: those are what appear on
+ * invoices and forms, and pointing the camera at one must not silently become
+ * the serial.
  */
+const ACCEPTED_FORMATS = new Set([
+  'CODE128',
+  'CODE39',
+  'CODE39STD',
+  'CODE39EXT',
+  'CODE93',
+  'CODE32',
+  'PZN',
+  'ITF',
+  'ITF14',
+  'CODABAR',
+  'EAN13',
+  'EAN8',
+  'ISBN',
+  'UPCA',
+  'UPCE',
+  'DATABAR',
+  'DATABAROMNI',
+  'DATABARSTK',
+  'DATABARSTKOMNI',
+  'DATABARLTD',
+  'DATABAREXP',
+  'DATABAREXPSTK',
+  'TELEPEN',
+  'TELEPENALPHA',
+  'TELEPENNUMERIC',
+])
+
 export function isAcceptedFormat(format: string): boolean {
-  return format.replace(/[-_\s]/g, '').toUpperCase() === 'CODE128'
+  return ACCEPTED_FORMATS.has(format.replace(/[-_\s]/g, '').toUpperCase())
 }

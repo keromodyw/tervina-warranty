@@ -51,10 +51,20 @@ describe('isAcceptedFormat', () => {
     expect(isAcceptedFormat('code-128')).toBe(true)
   })
 
-  it('rejects the symbologies we must not store', () => {
+  it('accepts the other common 1-D symbologies', () => {
+    expect(isAcceptedFormat('Code39')).toBe(true)
+    expect(isAcceptedFormat('CODE_39')).toBe(true)
+    expect(isAcceptedFormat('ITF')).toBe(true)
+    expect(isAcceptedFormat('EAN_13')).toBe(true)
+    expect(isAcceptedFormat('UPCA')).toBe(true)
+    expect(isAcceptedFormat('Codabar')).toBe(true)
+  })
+
+  it('rejects the 2-D symbologies we must not store', () => {
     // Pointing the camera at an invoice QR must not become the serial.
     expect(isAcceptedFormat('QR_CODE')).toBe(false)
-    expect(isAcceptedFormat('EAN_13')).toBe(false)
     expect(isAcceptedFormat('DATA_MATRIX')).toBe(false)
+    expect(isAcceptedFormat('PDF_417')).toBe(false)
+    expect(isAcceptedFormat('Aztec')).toBe(false)
   })
 })

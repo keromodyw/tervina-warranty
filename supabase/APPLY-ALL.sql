@@ -814,6 +814,217 @@ grant select, insert, update, delete on public.staff          to authenticated;
 grant all on all tables in schema public to service_role;
 grant execute on all functions in schema public to service_role;
 
+-- ---------- BEGIN supabase\migrations\20260101121000_11_claim_fields.sql ----------
+-- M7 / step 11: claim fields captured by the wizard but absent from the original
+-- schema. Additive and idempotent - safe to re-run on an existing database.
+--
+--   technician_name / technician_phone : who installed the pump (step 1 collects
+--     them; they belong to the claim, not the customer, because the same
+--     customer may activate several units installed by different technicians).
+--   notes            : free-text review note (staff or customer context).
+--   source           : provenance, so imported legacy rows can be told apart
+--     from rows filed through the wizard. 'web' is the default for new claims.
+--   photos_exported_at : timestamp to pair with the existing photos_exported
+--     boolean, matching the sent_at/sent_to_customer convention.
+
+alter table public.warranty_claims
+  add column if not exists technician_name     text,
+  add column if not exists technician_phone    text,
+  add column if not exists notes               text,
+  add column if not exists source              text not null default 'web',
+  add column if not exists photos_exported_at  timestamptz;
+
+-- kept in sync by trigger like the other audit flags (see step 5)
+create or replace function public.sync_photos_exported_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.photos_exported = true and new.photos_exported_at is null then
+    new.photos_exported_at := now();
+  elsif new.photos_exported = false then
+    new.photos_exported_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists claims_sync_exported_at on public.warranty_claims;
+create trigger claims_sync_exported_at
+  before insert or update on public.warranty_claims
+  for each row execute function public.sync_photos_exported_at();
+
+-- ---------- BEGIN supabase\migrations\20260101121100_12_codes_and_reason.sql ----------
+-- M7 / step 12: shorter, item-related activation codes + expose the decline
+-- reason to the customer.
+--
+--   activation_code : was 'TV-' + 10 random hex. Now 'TV-<item>-<4 chars>'
+--     (e.g. TV-DP-7K2F), where <item> is a short Latin code for the Arabic item
+--     type, so support can recognise the family of the unit at a glance and
+--     search/group by it. The random suffix uses an unambiguous base32 alphabet
+--     (no I/O/0/1) and is retried until unique.
+--     The format CHECK is widened, not replaced, so pre-existing 10-hex codes
+--     still validate and no old row is touched.
+--
+--   track_claims_by_phone : now also returns decline_reason, so a declined
+--     customer is told why. Still returns no PII.
+
+-- 1. item-type -> short Latin code
+create or replace function public.activation_item_code(p_item_type text)
+returns text
+language sql
+immutable
+as $$
+  select case p_item_type
+    when 'طلمبات ايطالى تحضير' then 'IT'
+    when 'طلمبات صينى تحضير'  then 'CN'
+    when 'طلمبات اعماق'        then 'DP'
+    when 'طلمبات غاطس'         then 'SB'
+    when 'حمايه'               then 'PR'
+    when 'سباحه'               then 'SW'
+    else 'GN'
+  end;
+$$;
+
+comment on function public.activation_item_code(text) is
+  'Short Latin code for an Arabic item_type, used in activation codes.';
+
+-- 2. generator: item code + random suffix, retried until unique.
+--    SECURITY DEFINER so the uniqueness probe is not itself filtered by RLS.
+create or replace function public.assign_activation_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  item_code text := public.activation_item_code(new.item_type);
+  alphabet  text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  candidate text;
+  i         int;
+begin
+  loop
+    candidate := 'TV-' || item_code || '-';
+    for i in 1..4 loop
+      candidate := candidate || substr(alphabet, 1 + floor(random() * length(alphabet))::int, 1);
+    end loop;
+    exit when not exists (
+      select 1 from public.warranty_claims wc where wc.activation_code = candidate
+    );
+  end loop;
+  new.activation_code := candidate;
+  return new;
+end;
+$$;
+
+-- 3. widen the code format check: new item codes AND legacy 10-hex codes.
+alter table public.warranty_claims drop constraint if exists claims_activation_code_fmt;
+alter table public.warranty_claims
+  add constraint claims_activation_code_fmt check (
+    activation_code is null
+    or activation_code ~ '^TV-[0-9A-F]{10}$'
+    or activation_code ~ '^TV-[A-Z]{2}-[A-Z0-9]{4}$'
+  );
+
+-- 4. tracking reports the decline reason too (return type changes -> recreate).
+drop function if exists public.track_claims_by_phone(text);
+create function public.track_claims_by_phone(p_phone text)
+returns table (
+  activation_code text,
+  serial          text,
+  item_type       text,
+  product_type    text,
+  capacity        text,
+  status          text,
+  decline_reason  text,
+  warranty_start  date,
+  warranty_end    date,
+  submitted_at    timestamptz
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select
+    wc.activation_code,
+    wc.serial,
+    wc.item_type,
+    wc.product_type,
+    wc.capacity,
+    wc.status,
+    wc.decline_reason,
+    wc.warranty_start,
+    wc.warranty_end,
+    wc.created_at
+  from public.warranty_claims wc
+  join public.customers c on c.id = wc.customer_id
+  where c.phone = public.normalize_phone(p_phone)
+  order by wc.created_at desc;
+$$;
+
+comment on function public.track_claims_by_phone(text) is
+  'Customer-facing lookup by phone. Deliberately returns no PII.';
+
+revoke all on function public.track_claims_by_phone(text) from public;
+grant execute on function public.track_claims_by_phone(text) to anon, authenticated;
+
+-- ---------- BEGIN supabase\migrations\20260101121200_13_admin_bulk.sql ----------
+-- M7 / step 13: staff bulk tooling (legacy import + photo/Excel export).
+--
+-- Two additive changes, both needed only by the admin panel:
+--
+--   1. customers.auth_user_id must be nullable. Legacy rows imported from the
+--      old ledger have no Supabase Auth identity - they were never signed up
+--      through the wizard. UNIQUE already permits many NULLs, so dropping NOT
+--      NULL is enough; the ownership policies (auth_user_id = auth.uid()) simply
+--      never match a NULL, which is the correct behaviour.
+--
+--   2. Staff need INSERT on customers and warranty_claims for the import. The
+--      customer policies only ever allowed auth_user_id = auth.uid(); staff
+--      import creates rows on behalf of people who will never log in.
+--
+-- Everything else (reads, review updates, deletes) is already covered by the
+-- is_staff() policies in step 7.
+
+alter table public.customers alter column auth_user_id drop not null;
+
+drop policy if exists "staff insert customers" on public.customers;
+create policy "staff insert customers"
+  on public.customers for insert
+  to authenticated
+  with check (public.is_staff());
+
+drop policy if exists "staff update customers" on public.customers;
+create policy "staff update customers"
+  on public.customers for update
+  to authenticated
+  using (public.is_staff())
+  with check (public.is_staff());
+
+drop policy if exists "staff insert claims" on public.warranty_claims;
+create policy "staff insert claims"
+  on public.warranty_claims for insert
+  to authenticated
+  with check (public.is_staff());
+
+-- ---------- BEGIN supabase\migrations\20260101121300_14_serial_reuse.sql ----------
+-- M-step 14: let a declined claim release its serial.
+--
+-- A serial is unique only while its claim is still in play. Weaker than a plain
+-- UNIQUE (step 5): once an admin declines a claim, that serial is free to be
+-- activated again, so a customer is never permanently locked out by a rejected
+-- submission. Pending and approved claims keep their exclusive hold, which is
+-- what stops the same box being registered twice.
+
+alter table public.warranty_claims
+  drop constraint if exists warranty_claims_serial_key;
+
+-- Partial unique index: exactly one non-declined claim per serial.
+create unique index if not exists claims_serial_active_key
+  on public.warranty_claims (serial)
+  where status <> 'declined';
+
 -- ---------- BEGIN supabase\seed.sql ----------
 -- AUTO-GENERATED by tools/resolve-warranty.mjs - do not hand-edit.
 -- Baseline for the admin Settings tab (D22). Durations are snapshotted

@@ -10,7 +10,7 @@ if (!url || !anonKey) {
 }
 
 /**
- * Single shared client. The anon key is public by design — every access control
+ * Single shared client. The anon key is public by design - every access control
  * lives in RLS, never in the client (PROJECT_MAP [Security model]).
  */
 export const supabase = createClient(url, anonKey, {

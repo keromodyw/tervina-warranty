@@ -23,7 +23,7 @@ const html = `<!doctype html>
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <title>تفعيل الضمان | تروفينا</title>
+    <title>تفعيل الضمان | ترفينا</title>
     <script>
       // Encode the real path as a query string, then hand off to index.html,
       // which decodes it back into a clean URL. See scripts/pages-404.mjs.
