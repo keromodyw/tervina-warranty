@@ -296,4 +296,11 @@ begin
 end;
 $$;
 
+-- Unambiguous result marker. Every check above reports via RAISE NOTICE, which
+-- the Supabase SQL Editor does not reliably render, so a passing run would look
+-- identical to a no-op. A returned row always displays. Reaching this line at
+-- all means nothing raised: the first failing assertion aborts the transaction,
+-- so "row shown" is PASS and "error shown" is FAIL.
+select 'ALL PASS - RLS holds, tracking leaks no PII' as result;
+
 rollback;
