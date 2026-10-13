@@ -645,7 +645,11 @@ create policy "staff manage all photos"
 -- If you ever need to expose this publicly, confirm the definer role's
 -- BYPASSRLS status first - see the FORCE RLS note in step 7.
 
-create or replace function public.track_claims_by_phone(p_phone text)
+-- Cannot be CREATE OR REPLACE: step 12 widens the OUT list (adds
+-- decline_reason), and PostgreSQL refuses to change a function's return type in
+-- place. Dropping first keeps APPLY-ALL re-runnable against an existing DB.
+drop function if exists public.track_claims_by_phone(text);
+create function public.track_claims_by_phone(p_phone text)
 returns table (
   activation_code text,
   serial          text,
