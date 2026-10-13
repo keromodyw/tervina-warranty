@@ -4,6 +4,8 @@
 --
 -- Concatenation of supabase/migrations/* + supabase/seed.sql.
 -- migrations/ stays the source of truth for supabase db reset.
+--
+-- DO NOT EDIT BY HAND. Regenerate with:  node tools/build-apply-all.mjs
 -- ============================================================
 
 -- ---------- BEGIN supabase\migrations\20260101120000_01_staff.sql ----------
@@ -117,6 +119,13 @@ create trigger on_auth_user_created
 -- Normalise an Egyptian number to +20XXXXXXXXXX.
 -- Single source of truth: the app, the tracking RPC and staff search must all
 -- agree, otherwise tracking silently returns zero rows for a valid customer.
+--
+-- Kept deliberately identical to src/core/lib/phone.ts. Two bugs were found and
+-- fixed here first, and both are pinned by phone.test.ts on the TS side:
+--   1. Arabic-Indic digits (٠-٩) were stripped instead of folded, so a number
+--      typed on an Arabic keyboard returned NULL.
+--   2. A `length = 11 and left = '1'` branch mangled foreign numbers, turning
+--      +1 415 555 2671 into +204155552671.
 create or replace function public.normalize_phone(raw text)
 returns text
 language sql
@@ -126,14 +135,22 @@ as $$
   select case
     when raw is null then null
     when digits = '' then null
+    when left(digits, 2) = '00' then
+      case when length(digits) > 2 then '+' || substr(digits, 3) else null end
     when digits like '20%' and length(digits) = 12 then '+' || digits
     when left(digits, 1) = '0' then '+20' || ltrim(substr(digits, 2), '0')
     when length(digits) = 10 then '+20' || digits
-    when length(digits) = 11 and left(digits, 1) = '1' then '+20' || substr(digits, 2)
     else '+' || digits
   end
   from (
-    select regexp_replace(coalesce(raw, ''), '[^0-9]', '', 'g') as digits
+    -- Fold Arabic-Indic and Eastern Arabic-Indic digits BEFORE stripping, so a
+    -- valid Egyptian number is not deleted to an empty string.
+    select regexp_replace(
+             translate(coalesce(raw, ''),
+                       '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹',
+                       '01234567890123456789'),
+             '[^0-9]', '', 'g'
+           ) as digits
   ) s;
 $$;
 
@@ -240,7 +257,7 @@ create table if not exists public.warranty_rules (
   item_type       text not null,
   product_type         text not null,
 
-  -- NULL is meaningful: product types such as Ø§Ù„Ø³Ø¨Ø§Ø­Ø© have no duration yet.
+  -- NULL is meaningful: product types such as السباحة have no duration yet.
   warranty_months integer,
 
   updated_by      uuid references auth.users (id) on delete set null,
@@ -253,7 +270,7 @@ create table if not exists public.warranty_rules (
 );
 
 comment on column public.warranty_rules.warranty_months is
-  'NULL = not configured yet (e.g. Ø§Ù„Ø³Ø¨Ø§Ø­Ø©). The wizard falls back to the generated constants, which are also NULL.';
+  'NULL = not configured yet (e.g. السباحة). The wizard falls back to the generated constants, which are also NULL.';
 
 -- Seeded by tools/resolve-warranty.mjs (22 rows) via `supabase db reset`.
 -- On an already-migrated database apply it with:
@@ -270,7 +287,7 @@ comment on column public.warranty_rules.warranty_months is
 create table if not exists public.warranty_claims (
   id              uuid primary key default gen_random_uuid(),
 
-  -- ÙƒÙˆØ¯ Ø§Ù„ØªÙØ¹ÙŠÙ„Ù‡ - what the customer reads out to support. Assigned on insert.
+  -- كود التفعيله - what the customer reads out to support. Assigned on insert.
   activation_code text unique,
 
   customer_id     uuid not null references public.customers (id) on delete cascade,
@@ -338,7 +355,7 @@ create index if not exists claims_customer_idx   on public.warranty_claims (cust
 create index if not exists claims_status_idx     on public.warranty_claims (status);
 create index if not exists claims_created_idx    on public.warranty_claims (created_at desc);
 
--- ÙƒÙˆØ¯ Ø§Ù„ØªÙØ¹ÙŠÙ„Ù‡: unguessable, so tracking-by-code could never be used to
+-- كود التفعيله: unguessable, so tracking-by-code could never be used to
 -- enumerate other people's claims. Core function, no extension required.
 create or replace function public.assign_activation_code()
 returns trigger
@@ -758,28 +775,26 @@ create policy "staff delete claim photo"
 -- an issued certificate.
 
 insert into warranty_rules (item_type, product_type, warranty_months) values
-  ('Ø·Ù„Ù…Ø¨Ø§Øª Ø§ÙŠØ·Ø§Ù„Ù‰ ØªØ­Ø¶ÙŠØ±', 'ÙØ§Ù…Ø§', 84),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª Ø§ÙŠØ·Ø§Ù„Ù‰ ØªØ­Ø¶ÙŠØ±', 'Ù…Ø§ØªØ±ÙŠÙƒØ³', 84),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª Ø§ÙŠØ·Ø§Ù„Ù‰ ØªØ­Ø¶ÙŠØ±', 'Ø±Ø§ÙÙŠÙ„Ùˆ', 84),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª Ø§ÙŠØ·Ø§Ù„Ù‰ ØªØ­Ø¶ÙŠØ±', 'Ø±ÙˆØ¯Ù„Ù', 36),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª Ø§ÙŠØ·Ø§Ù„Ù‰ ØªØ­Ø¶ÙŠØ±', 'ÙÙŠÙ†ÙˆÙƒØ³', 36),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØµÙŠÙ†Ù‰ ØªØ­Ø¶ÙŠØ±', 'ØªØ±ÙÙŠÙ†Ø§', 24),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØµÙŠÙ†Ù‰ ØªØ­Ø¶ÙŠØ±', 'ØªØ±ÙÙŠÙ†Ø§ Ø¨Ø±ÙŠÙ…ÙŠØ±', 24),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØµÙŠÙ†Ù‰ ØªØ­Ø¶ÙŠØ±', 'Ù…ÙŠØ±Ùˆ', 12),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØµÙŠÙ†Ù‰ ØªØ­Ø¶ÙŠØ±', 'Ù…ÙŠØ±Ùˆ Ø¨Ø±ÙŠÙ…ÙŠØ±', 12),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØµÙŠÙ†Ù‰ ØªØ­Ø¶ÙŠØ±', 'ÙƒÙŠØ±Ù…ÙŠÙ†Ø§', 12),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØµÙŠÙ†Ù‰ ØªØ­Ø¶ÙŠØ±', 'ÙƒØ±Ù…ÙŠÙ†Ø§ Ø¨Ø±ÙŠÙ…ÙŠØ±', 12),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØµÙŠÙ†Ù‰ ØªØ­Ø¶ÙŠØ±', 'ÙØ±Ù†Ø¯Ø³', 12),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª Ø§Ø¹Ù…Ø§Ù‚', 'ÙØ§Ù…Ø§', 60),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª Ø§Ø¹Ù…Ø§Ù‚', 'ØªØ±ÙÙŠÙ†Ø§', 60),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØºØ§Ø·Ø³', 'ÙØ§Ù…Ø§', 60),
-  ('Ø·Ù„Ù…Ø¨Ø§Øª ØºØ§Ø·Ø³', 'ØªØ±ÙÙŠÙ†Ø§', 60),
-  ('Ø­Ù…Ø§ÙŠÙ‡', 'Ø®Ø²Ø§Ù† ØªÙŠÙˆØ¨Ù„Ø³ 19Ù„ØªØ±', 12),
-  ('Ø­Ù…Ø§ÙŠÙ‡', 'Ø®Ø²Ø§Ù† ØªÙŠÙˆØ¨Ù„Ø³ 24 Ù„ØªØ±', 18),
-  ('Ø³Ø¨Ø§Ø­Ù‡', 'scp', NULL),
-  ('Ø³Ø¨Ø§Ø­Ù‡', 'sbp', NULL),
-  ('Ø³Ø¨Ø§Ø­Ù‡', 'lp', NULL),
-  ('Ø³Ø¨Ø§Ø­Ù‡', 'vmax', NULL);
-
+  ('طلمبات ايطالى تحضير', 'فاما', 84),
+  ('طلمبات ايطالى تحضير', 'ماتريكس', 84),
+  ('طلمبات ايطالى تحضير', 'رافيلو', 84),
+  ('طلمبات ايطالى تحضير', 'رودلف', 36),
+  ('طلمبات ايطالى تحضير', 'فينوكس', 36),
+  ('طلمبات صينى تحضير', 'ترفينا', 24),
+  ('طلمبات صينى تحضير', 'ترفينا بريمير', 24),
+  ('طلمبات صينى تحضير', 'ميرو', 12),
+  ('طلمبات صينى تحضير', 'ميرو بريمير', 12),
+  ('طلمبات صينى تحضير', 'كيرمينا', 12),
+  ('طلمبات صينى تحضير', 'كرمينا بريمير', 12),
+  ('طلمبات صينى تحضير', 'فرندس', 12),
+  ('طلمبات اعماق', 'فاما', 60),
+  ('طلمبات اعماق', 'ترفينا', 60),
+  ('طلمبات غاطس', 'فاما', 60),
+  ('طلمبات غاطس', 'ترفينا', 60),
+  ('حمايه', 'خزان تيوبلس 19لتر', 12),
+  ('حمايه', 'خزان تيوبلس 24 لتر', 18),
+  ('سباحه', 'scp', NULL),
+  ('سباحه', 'sbp', NULL),
+  ('سباحه', 'lp', NULL),
+  ('سباحه', 'vmax', NULL)
 on conflict (item_type, product_type) do nothing;
-

@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "gen:data": "node tools/gen-data.mjs",
     "gen:warranty": "node tools/resolve-warranty.mjs",
+    "gen:apply": "node tools/build-apply-all.mjs",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
     "test": "vitest run"

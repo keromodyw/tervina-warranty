@@ -231,11 +231,13 @@ if (!problems.length) {
       .map(
         (r, i) =>
           `  (${lit(r.item)}, ${lit(r.product)}, ${r.months === null ? 'NULL' : r.months})${
-            i === rows.length - 1 ? ';' : ','
+            i === rows.length - 1 ? '' : ','
           }`,
       )
       .join('\n'),
-    '',
+    // No semicolon on the final row above: ON CONFLICT is part of the same
+    // statement. Terminating the VALUES list first makes this a second,
+    // standalone statement, which is a syntax error the whole file fails on.
     'on conflict (item_type, product_type) do nothing;',
     '',
   ].join('\n')

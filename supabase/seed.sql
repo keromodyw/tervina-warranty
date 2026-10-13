@@ -25,6 +25,5 @@ insert into warranty_rules (item_type, product_type, warranty_months) values
   ('سباحه', 'scp', NULL),
   ('سباحه', 'sbp', NULL),
   ('سباحه', 'lp', NULL),
-  ('سباحه', 'vmax', NULL);
-
+  ('سباحه', 'vmax', NULL)
 on conflict (item_type, product_type) do nothing;
